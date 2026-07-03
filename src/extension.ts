@@ -97,16 +97,13 @@ async function commitComposeBuffer(copyOnly: boolean) {
 
   const behavior = getCommitBehavior();
   const terminal = capturedTerminal ?? lastTerminal;
-  let shouldFocusTerminal = false;
-  if (!copyOnly && shouldSendToTerminal(behavior, Boolean(terminal)) && terminal) {
-    terminal.show(false);
-    terminal.sendText(text, false);
-    shouldFocusTerminal = true;
-  }
+  const shouldSend = !copyOnly && shouldSendToTerminal(behavior, Boolean(terminal)) && terminal;
 
   await closeAndDeleteBuffer(document);
 
-  if (shouldFocusTerminal) {
+  if (shouldSend) {
+    terminal.show(false);
+    terminal.sendText(text, false);
     await vscode.commands.executeCommand('workbench.action.terminal.focus');
   }
 }
