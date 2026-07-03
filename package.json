@@ -6,6 +6,10 @@
   "publisher": "local",
   "license": "MIT",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/doubleday/vscode-compose-buffer.git"
+  },
   "engines": {
     "vscode": "^1.92.0"
   },
