@@ -1,0 +1,126 @@
+{
+  "name": "compose-buffer",
+  "displayName": "Compose Buffer",
+  "description": "A native VS Code compose buffer for terminal-based coding agents.",
+  "version": "0.0.1",
+  "publisher": "local",
+  "license": "MIT",
+  "private": true,
+  "engines": {
+    "vscode": "^1.92.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:composeBuffer.open",
+    "onLanguage:compose-buffer"
+  ],
+  "main": "./dist/extension.js",
+  "scripts": {
+    "compile": "tsc -p ./",
+    "check": "npm run compile && node test/helpers.test.js",
+    "vscode:prepublish": "npm run compile"
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "composeBuffer.open",
+        "title": "Compose Buffer: Open"
+      },
+      {
+        "command": "composeBuffer.commit",
+        "title": "Compose Buffer: Commit"
+      },
+      {
+        "command": "composeBuffer.copyOnly",
+        "title": "Compose Buffer: Copy Only"
+      },
+      {
+        "command": "composeBuffer.cancel",
+        "title": "Compose Buffer: Cancel"
+      }
+    ],
+    "configuration": {
+      "title": "Compose Buffer",
+      "properties": {
+        "composeBuffer.commitBehavior": {
+          "type": "string",
+          "enum": [
+            "copyAndPaste",
+            "copyOnly"
+          ],
+          "default": "copyAndPaste",
+          "description": "What happens when the compose buffer is committed."
+        },
+        "composeBuffer.imageDirectory": {
+          "type": "string",
+          "default": ".images",
+          "description": "Workspace-relative directory used for pasted images."
+        },
+        "composeBuffer.imageReferenceStyle": {
+          "type": "string",
+          "enum": [
+            "atPath",
+            "path"
+          ],
+          "default": "atPath",
+          "description": "How pasted image references are inserted."
+        }
+      }
+    },
+    "keybindings": [
+      {
+        "command": "composeBuffer.commit",
+        "key": "ctrl+enter",
+        "mac": "ctrl+enter",
+        "when": "composeBuffer.active && editorTextFocus"
+      },
+      {
+        "command": "composeBuffer.commit",
+        "key": "escape",
+        "when": "composeBuffer.active && editorTextFocus"
+      },
+      {
+        "command": "composeBuffer.cancel",
+        "key": "shift+escape",
+        "when": "composeBuffer.active && editorTextFocus"
+      }
+    ],
+    "languages": [
+      {
+        "id": "compose-buffer",
+        "aliases": [
+          "Compose Buffer"
+        ],
+        "extensions": [
+          ".compose.md"
+        ]
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "composeBuffer.open"
+        },
+        {
+          "command": "composeBuffer.commit",
+          "when": "composeBuffer.active"
+        },
+        {
+          "command": "composeBuffer.copyOnly",
+          "when": "composeBuffer.active"
+        },
+        {
+          "command": "composeBuffer.cancel",
+          "when": "composeBuffer.active"
+        }
+      ]
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.12",
+    "@types/vscode": "^1.92.0",
+    "typescript": "^5.5.4"
+  }
+}
