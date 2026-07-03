@@ -23,3 +23,11 @@ While the compose buffer is active, `Ctrl+Enter` and `Esc` commit it.
 npm install
 npm run check
 ```
+
+## Install From GitHub Release
+
+Download the `.vsix` file from the latest GitHub Release, then run:
+
+```sh
+code --install-extension compose-buffer-*.vsix
+```
