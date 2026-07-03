@@ -70,6 +70,7 @@ async function openComposeBuffer() {
     const existing = vscode.workspace.textDocuments.find((document) => document.uri.toString() === activeBufferUri?.toString());
     if (existing) {
       await vscode.window.showTextDocument(existing, { preview: false });
+      await enterVimInsertMode();
       await updateActiveContext();
       return;
     }
@@ -83,6 +84,7 @@ async function openComposeBuffer() {
   const document = await vscode.workspace.openTextDocument(activeBufferUri);
   await vscode.languages.setTextDocumentLanguage(document, languageId);
   await vscode.window.showTextDocument(document, { preview: false });
+  await enterVimInsertMode();
   await updateActiveContext();
 }
 
@@ -159,6 +161,13 @@ function isComposeBuffer(document: vscode.TextDocument | undefined): boolean {
 
 async function updateActiveContext() {
   await vscode.commands.executeCommand('setContext', contextKey, isComposeBuffer(vscode.window.activeTextEditor?.document));
+}
+
+async function enterVimInsertMode() {
+  const commands = await vscode.commands.getCommands(true);
+  if (commands.includes('extension.vim_insert')) {
+    await vscode.commands.executeCommand('extension.vim_insert');
+  }
 }
 
 function getCommitBehavior(): CommitBehavior {

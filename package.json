@@ -24,6 +24,7 @@
   "scripts": {
     "compile": "tsc -p ./",
     "check": "npm run compile && node test/helpers.test.js",
+    "install:local": "npm run check && npx --yes @vscode/vsce package --out compose-buffer-local.vsix && code --install-extension compose-buffer-local.vsix --force",
     "vscode:prepublish": "npm run compile"
   },
   "contributes": {
