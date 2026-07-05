@@ -71,6 +71,34 @@
           ],
           "default": "atPath",
           "description": "How pasted image references are inserted."
+        },
+        "composeBuffer.agentCompletions": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "default": [],
+          "description": "Agent skill and command completions to suggest after $ or / in the compose buffer. Values are fuzzy matched as you type. An object can map custom aliases to inserted skill or command names."
         }
       }
     },
@@ -103,6 +131,13 @@
         ]
       }
     ],
+    "configurationDefaults": {
+      "[compose-buffer]": {
+        "editor.quickSuggestions": false,
+        "editor.wordBasedSuggestions": "off",
+        "editor.suggestOnTriggerCharacters": true
+      }
+    },
     "menus": {
       "commandPalette": [
         {
