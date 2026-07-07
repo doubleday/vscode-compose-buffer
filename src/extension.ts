@@ -11,9 +11,30 @@ import {
   normalizeWorkspacePath,
   shouldSendToTerminal
 } from './helpers';
+import {
+  PathCompletionQuery,
+  PathIndex,
+  createPathIndex,
+  getShortestUniquePathSuffix,
+  parsePathCompletionQuery,
+  searchPathIndex
+} from './pathIndex';
 
 const languageId = 'compose-buffer';
 const contextKey = 'composeBuffer.active';
+const fileCompletionLimit = 200;
+const fileIndexLimit = 50000;
+const fileSearchExclude = '**/{.git,node_modules,dist,out,build,coverage}/**';
+const pathCompletionTriggerCharacters = [
+  '@',
+  ':',
+  '?',
+  '/',
+  '.',
+  '-',
+  '_',
+  ...'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+];
 
 type AgentCompletionValue = string | string[];
 type AgentCompletionConfig = string[] | Record<string, AgentCompletionValue>;
@@ -31,6 +52,9 @@ type AgentCompletionReference = {
 let activeBufferUri: vscode.Uri | undefined;
 let capturedTerminal: vscode.Terminal | undefined;
 let lastTerminal: vscode.Terminal | undefined;
+let workspacePathIndex: PathIndex | undefined;
+let workspacePathIndexPromise: Promise<PathIndex> | undefined;
+let workspacePathIndexTruncated = false;
 
 export function activate(context: vscode.ExtensionContext) {
   lastTerminal = vscode.window.activeTerminal;
@@ -54,10 +78,11 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('composeBuffer.commit', () => commitComposeBuffer(false)),
     vscode.commands.registerCommand('composeBuffer.copyOnly', () => commitComposeBuffer(true)),
     vscode.commands.registerCommand('composeBuffer.cancel', cancelComposeBuffer),
+    vscode.commands.registerCommand('composeBuffer.rebuildFileIndex', rebuildWorkspacePathIndex),
     vscode.languages.registerCompletionItemProvider(
       { language: languageId },
       new WorkspaceFileCompletionProvider(),
-      '@'
+      ...pathCompletionTriggerCharacters
     ),
     vscode.languages.registerCompletionItemProvider(
       { language: languageId },
@@ -216,27 +241,117 @@ function getAgentCompletions(): AgentCompletionConfig {
 class WorkspaceFileCompletionProvider implements vscode.CompletionItemProvider {
   async provideCompletionItems(
     document: vscode.TextDocument,
-    position: vscode.Position
-  ): Promise<vscode.CompletionItem[]> {
+    position: vscode.Position,
+    token: vscode.CancellationToken
+  ): Promise<vscode.CompletionList> {
     const range = getAtReferenceRange(document, position);
     if (!range || !vscode.workspace.workspaceFolders?.length) {
-      return [];
+      return new vscode.CompletionList();
     }
 
-    const files = await vscode.workspace.findFiles('**/*', '**/{.git,node_modules}/**', 200);
-    return files.map((uri) => {
-      const relativePath = normalizeWorkspacePath(vscode.workspace.asRelativePath(uri, false));
-      const item = new vscode.CompletionItem(`@${relativePath}`, vscode.CompletionItemKind.File);
-      item.insertText = `@${relativePath}`;
-      item.range = range;
-      return item;
+    let index: PathIndex;
+    try {
+      index = await getWorkspacePathIndex(token);
+    } catch (error) {
+      if (token.isCancellationRequested) {
+        return new vscode.CompletionList();
+      }
+      throw error;
+    }
+
+    if (token.isCancellationRequested) {
+      return new vscode.CompletionList();
+    }
+
+    const referenceText = document.getText(range);
+    const query = parsePathCompletionQuery(referenceText.slice(1));
+    const paths = searchPathIndex(index, query, fileCompletionLimit);
+    const items = paths.map((relativePath, index) => {
+      const displayPath = getShortestUniquePathSuffix(relativePath, paths);
+      return createPathCompletionItem(relativePath, displayPath, query, range, referenceText, index);
     });
+
+    return new vscode.CompletionList(items, true);
   }
+}
+
+async function rebuildWorkspacePathIndex() {
+  workspacePathIndex = undefined;
+  workspacePathIndexPromise = undefined;
+  workspacePathIndexTruncated = false;
+
+  if (!vscode.workspace.workspaceFolders?.length) {
+    await vscode.window.showInformationMessage('Compose Buffer file index skipped because no workspace is open.');
+    return;
+  }
+
+  await getWorkspacePathIndex();
+  const suffix = workspacePathIndexTruncated ? ` The first ${fileIndexLimit} files were indexed.` : '';
+  await vscode.window.showInformationMessage(`Compose Buffer file index rebuilt.${suffix}`);
+}
+
+async function getWorkspacePathIndex(token?: vscode.CancellationToken): Promise<PathIndex> {
+  if (workspacePathIndex) {
+    return workspacePathIndex;
+  }
+
+  if (!workspacePathIndexPromise) {
+    workspacePathIndexPromise = buildWorkspacePathIndex(token);
+  }
+
+  try {
+    workspacePathIndex = await workspacePathIndexPromise;
+    return workspacePathIndex;
+  } catch (error) {
+    workspacePathIndexPromise = undefined;
+    throw error;
+  }
+}
+
+async function buildWorkspacePathIndex(token?: vscode.CancellationToken): Promise<PathIndex> {
+  const files = await vscode.workspace.findFiles('**/*', fileSearchExclude, fileIndexLimit, token);
+  workspacePathIndexTruncated = files.length >= fileIndexLimit;
+  const paths = files.map((uri) => normalizeWorkspacePath(vscode.workspace.asRelativePath(uri, false)));
+  return createPathIndex(paths);
+}
+
+function createPathCompletionItem(
+  relativePath: string,
+  displayPath: string,
+  query: PathCompletionQuery,
+  range: vscode.Range,
+  referenceText: string,
+  index: number
+): vscode.CompletionItem {
+  const isDirectory = query.mode === 'directory';
+  const insertedPath = isDirectory ? `${relativePath}/` : relativePath;
+  const labelPath = isDirectory ? `${displayPath}/` : displayPath;
+  const item = new vscode.CompletionItem(
+    createPathCompletionLabel(insertedPath, labelPath),
+    isDirectory ? vscode.CompletionItemKind.Folder : vscode.CompletionItemKind.File
+  );
+  item.insertText = `@${insertedPath}`;
+  item.range = range;
+  item.filterText = referenceText;
+  item.sortText = index.toString().padStart(4, '0');
+  return item;
+}
+
+function createPathCompletionLabel(relativePath: string, displayPath: string): vscode.CompletionItemLabel {
+  const detail = relativePath.endsWith(displayPath)
+    ? relativePath.slice(0, relativePath.length - displayPath.length)
+    : undefined;
+
+  return {
+    label: `@${displayPath}`,
+    detail: detail ? ` ${detail}` : undefined,
+    description: relativePath
+  };
 }
 
 function getAtReferenceRange(document: vscode.TextDocument, position: vscode.Position): vscode.Range | undefined {
   const linePrefix = document.lineAt(position).text.slice(0, position.character);
-  const match = /(?:^|\s)(@[\w./-]*)$/.exec(linePrefix);
+  const match = /(?:^|\s)(@[\w./:?-]*)$/.exec(linePrefix);
   if (!match || match.index === undefined) {
     return undefined;
   }

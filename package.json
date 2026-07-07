@@ -18,6 +18,7 @@
   ],
   "activationEvents": [
     "onCommand:composeBuffer.open",
+    "onCommand:composeBuffer.rebuildFileIndex",
     "onLanguage:compose-buffer"
   ],
   "main": "./dist/extension.js",
@@ -44,6 +45,10 @@
       {
         "command": "composeBuffer.cancel",
         "title": "Compose Buffer: Cancel"
+      },
+      {
+        "command": "composeBuffer.rebuildFileIndex",
+        "title": "Compose Buffer: Rebuild File Index"
       }
     ],
     "configuration": {
@@ -154,6 +159,9 @@
         {
           "command": "composeBuffer.cancel",
           "when": "composeBuffer.active"
+        },
+        {
+          "command": "composeBuffer.rebuildFileIndex"
         }
       ]
     }

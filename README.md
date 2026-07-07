@@ -13,10 +13,28 @@ While the compose buffer is active, `Ctrl+Enter` and `Esc` commit it.
 
 ## Features
 
-- `@` file completions insert workspace-relative references.
+- `@` file completions insert workspace-relative references using a session-local file index.
+- `@f:` searches by file name, `@d:` searches by directory name, and `@?:` performs explicit fuzzy subsequence search.
 - `$` and `/` completions can suggest configured agent skills or commands.
 - Pasted images are written to `.images/` by default and inserted as `@.images/<timestamp>.png`.
 - If shell integration exposes a workspace-local terminal cwd, pasted images are saved relative to that cwd.
+
+## File References
+
+Compose Buffer indexes workspace files the first time `@` completion is used. The index is kept in memory for the VS Code session. Run `Compose Buffer: Rebuild File Index` after large file moves, generated file changes, or branch switches.
+
+Use the narrowest operator that matches what you know:
+
+```text
+@src/feat       complete workspace-relative paths
+@f:Login        search by file name
+@d:add-login    search by directory name
+@?:lgc          fuzzy subsequence search, such as LoginController
+```
+
+Directory completions insert a trailing slash so you can continue narrowing, for example `@d:add-login` can insert `@openspec/changes/add-login/`, then you can type `plan` to complete `plan.md`.
+
+Manual path-completion fixtures live under `test/assets/path-completions`. Try `@f:proposal` to test repeated OpenSpec-style filenames, or `@f:2026` to test timestamp-like image names.
 
 ## Settings
 
