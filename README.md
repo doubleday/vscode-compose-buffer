@@ -14,7 +14,8 @@ While the compose buffer is active, `Ctrl+Enter` and `Esc` commit it.
 ## Features
 
 - `@` file completions insert workspace-relative references using a session-local file index.
-- `@f:` searches by file name, `@d:` searches by directory name, and `@?:` performs explicit fuzzy subsequence search.
+- Plain `@` searches fuzzy matches across workspace-relative paths.
+- `@f:` searches fuzzy matches on file names, and `@d:` searches fuzzy matches on directory names without matching across path separators.
 - `$` and `/` completions can suggest configured agent skills or commands.
 - Pasted images are written to `.images/` by default and inserted as `@.images/<timestamp>.png`.
 - If shell integration exposes a workspace-local terminal cwd, pasted images are saved relative to that cwd.
@@ -26,10 +27,9 @@ Compose Buffer indexes workspace files the first time `@` completion is used. Th
 Use the narrowest operator that matches what you know:
 
 ```text
-@src/feat       complete workspace-relative paths
-@f:Login        search by file name
-@d:add-login    search by directory name
-@?:lgc          fuzzy subsequence search, such as LoginController
+@sfa            fuzzy search workspace-relative paths, such as src/features/auth
+@f:lct          fuzzy search file names, such as LoginControllerTest
+@d:add-login    fuzzy search directory names
 ```
 
 Directory completions insert a trailing slash so you can continue narrowing, for example `@d:add-login` can insert `@openspec/changes/add-login/`, then you can type `plan` to complete `plan.md`.

@@ -5,14 +5,14 @@ export type PathIndex = {
   directoriesByName: string[];
 };
 
-export type PathCompletionMode = 'path' | 'file' | 'directory' | 'fuzzy';
+export type PathCompletionMode = 'path' | 'file' | 'directory';
 
 export type PathCompletionQuery = {
   mode: PathCompletionMode;
   query: string;
 };
 
-const pathOperatorPattern = /^([fd?]):(.*)$/;
+const pathOperatorPattern = /^([fd]):(.*)$/;
 
 export function createPathIndex(paths: string[]): PathIndex {
   const files = Array.from(new Set(paths.map(normalizeIndexPath).filter(Boolean)));
@@ -54,18 +54,14 @@ export function searchPathIndex(index: PathIndex, query: PathCompletionQuery, li
   }
 
   if (query.mode === 'file') {
-    return searchByPrefix(index.filesByBasename, query.query, getBasename, limit);
+    return searchByFuzzyMatch(index.filesByBasename, query.query, getBasename, limit);
   }
 
   if (query.mode === 'directory') {
-    return searchByPrefix(index.directoriesByName, query.query, getBasename, limit);
+    return searchByFuzzyMatch(index.directoriesByName, query.query, getBasename, limit);
   }
 
-  if (query.mode === 'fuzzy') {
-    return searchBySubsequence(index.filesByBasename, query.query, limit);
-  }
-
-  return searchByPrefix(index.filesByPath, query.query, (path) => path, limit);
+  return searchByFuzzyMatch(index.filesByPath, query.query, (path) => path, limit);
 }
 
 export function getShortestUniquePathSuffix(filePath: string, candidates: string[]): string {
@@ -96,7 +92,7 @@ function normalizeQueryPath(filePath: string): string {
   return filePath.trim().replace(/\\/g, '/').replace(/^\/+/, '');
 }
 
-function searchByPrefix(
+function searchByFuzzyMatch(
   values: string[],
   query: string,
   keySelector: (value: string) => string,
@@ -107,32 +103,12 @@ function searchByPrefix(
     return values.slice(0, limit);
   }
 
-  const start = lowerBound(values, normalizedQuery, keySelector);
-  const results: string[] = [];
-
-  for (let index = start; index < values.length && results.length < limit; index += 1) {
-    const value = values[index];
-    if (!getSearchKey(keySelector(value)).startsWith(normalizedQuery)) {
-      break;
-    }
-    results.push(value);
-  }
-
-  return results;
-}
-
-function searchBySubsequence(values: string[], query: string, limit: number): string[] {
-  const normalizedQuery = getSearchKey(query);
-  if (!normalizedQuery) {
-    return values.slice(0, limit);
-  }
-
   return values
     .map((value, index) => {
       return {
         value,
         index,
-        score: getFuzzyPathMatchScore(normalizedQuery, value)
+        score: getFuzzyMatchScore(normalizedQuery, keySelector(value))
       };
     })
     .filter((match): match is { value: string; index: number; score: number } => match.score !== undefined)
@@ -141,72 +117,77 @@ function searchBySubsequence(values: string[], query: string, limit: number): st
     .map((match) => match.value);
 }
 
-function getFuzzyPathMatchScore(normalizedQuery: string, value: string): number | undefined {
-  const basename = getSearchKey(getBasename(value));
-  const path = getSearchKey(value);
-  const basenameScore = getFuzzyMatchScore(normalizedQuery, basename);
-  const pathScore = getFuzzyMatchScore(normalizedQuery, path);
-
-  if (basenameScore !== undefined) {
-    return basenameScore;
-  }
-
-  if (pathScore !== undefined) {
-    return 1000 + pathScore;
-  }
-
-  return undefined;
-}
-
 function getFuzzyMatchScore(normalizedQuery: string, target: string): number | undefined {
-  if (target.startsWith(normalizedQuery)) {
-    return target.length - normalizedQuery.length;
+  const normalizedTarget = getSearchKey(target);
+
+  if (normalizedTarget === normalizedQuery) {
+    return -200;
   }
 
-  const contiguousIndex = target.indexOf(normalizedQuery);
+  if (normalizedTarget.startsWith(normalizedQuery)) {
+    return -100 + target.length - normalizedQuery.length;
+  }
+
+  const contiguousIndex = normalizedTarget.indexOf(normalizedQuery);
   if (contiguousIndex >= 0) {
-    return 100 + contiguousIndex + target.length - normalizedQuery.length;
+    return 50 + contiguousIndex * 4 + target.length - normalizedQuery.length;
   }
 
-  let targetIndex = 0;
-  let firstMatchIndex = -1;
-  let lastMatchIndex = -1;
-  let gapScore = 0;
-
-  for (const char of normalizedQuery) {
-    const matchIndex = target.indexOf(char, targetIndex);
-    if (matchIndex < 0) {
-      return undefined;
-    }
-
-    if (firstMatchIndex < 0) {
-      firstMatchIndex = matchIndex;
-    }
-    if (lastMatchIndex >= 0) {
-      gapScore += matchIndex - lastMatchIndex - 1;
-    }
-
-    lastMatchIndex = matchIndex;
-    targetIndex = matchIndex + 1;
+  const subsequenceScore = getFuzzySubsequenceScore(normalizedQuery, target, normalizedTarget);
+  if (subsequenceScore === undefined) {
+    return undefined;
   }
 
-  return 500 + firstMatchIndex + gapScore + target.length - normalizedQuery.length;
+  return 300 + target.length - normalizedQuery.length + subsequenceScore;
 }
 
-function lowerBound(values: string[], query: string, keySelector: (value: string) => string): number {
-  let low = 0;
-  let high = values.length;
+function getFuzzySubsequenceScore(
+  normalizedQuery: string,
+  target: string,
+  normalizedTarget: string
+): number | undefined {
+  const memo = new Map<string, number | undefined>();
 
-  while (low < high) {
-    const mid = Math.floor((low + high) / 2);
-    if (getSearchKey(keySelector(values[mid])) < query) {
-      low = mid + 1;
-    } else {
-      high = mid;
+  function findBest(queryIndex: number, previousMatchIndex: number): number | undefined {
+    if (queryIndex >= normalizedQuery.length) {
+      return 0;
     }
+
+    const memoKey = `${queryIndex}:${previousMatchIndex}`;
+    if (memo.has(memoKey)) {
+      return memo.get(memoKey);
+    }
+
+    let bestScore: number | undefined;
+    const queryChar = normalizedQuery[queryIndex];
+
+    for (let index = previousMatchIndex + 1; index < normalizedTarget.length; index += 1) {
+      if (normalizedTarget[index] !== queryChar) {
+        continue;
+      }
+
+      const restScore = findBest(queryIndex + 1, index);
+      if (restScore === undefined) {
+        continue;
+      }
+
+      const distanceScore = previousMatchIndex < 0
+        ? index * 4
+        : (index - previousMatchIndex - 1) * 12;
+      const boundaryBonus = getBoundaryBonus(target, index);
+      const uppercaseBonus = isUppercaseLetter(target[index]) ? 40 : 0;
+      const score = distanceScore - boundaryBonus - uppercaseBonus + restScore;
+
+      if (bestScore === undefined || score < bestScore) {
+        bestScore = score;
+      }
+    }
+
+    memo.set(memoKey, bestScore);
+    return bestScore;
   }
 
-  return low;
+  return findBest(0, -1);
 }
 
 function sortByKey(values: string[], keySelector: (value: string) => string): string[] {
@@ -223,6 +204,35 @@ function getSearchKey(value: string): string {
 function getBasename(filePath: string): string {
   const index = filePath.lastIndexOf('/');
   return index >= 0 ? filePath.slice(index + 1) : filePath;
+}
+
+function getBoundaryBonus(target: string, index: number): number {
+  if (index === 0) {
+    return 120;
+  }
+
+  const previous = target[index - 1];
+  if (previous === '/') {
+    return 120;
+  }
+
+  if (previous === '-' || previous === '_' || previous === '.') {
+    return 50;
+  }
+
+  if (isLowercaseLetter(previous) && isUppercaseLetter(target[index])) {
+    return 100;
+  }
+
+  return 0;
+}
+
+function isUppercaseLetter(char: string): boolean {
+  return char >= 'A' && char <= 'Z';
+}
+
+function isLowercaseLetter(char: string): boolean {
+  return char >= 'a' && char <= 'z';
 }
 
 function getParentDirectories(filePath: string): string[] {
@@ -242,8 +252,5 @@ function getOperatorMode(operator: string): PathCompletionMode {
   if (operator === 'f') {
     return 'file';
   }
-  if (operator === 'd') {
-    return 'directory';
-  }
-  return 'fuzzy';
+  return 'directory';
 }

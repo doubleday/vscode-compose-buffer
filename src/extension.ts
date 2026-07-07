@@ -28,7 +28,6 @@ const fileSearchExclude = '**/{.git,node_modules,dist,out,build,coverage}/**';
 const pathCompletionTriggerCharacters = [
   '@',
   ':',
-  '?',
   '/',
   '.',
   '-',
@@ -351,7 +350,7 @@ function createPathCompletionLabel(relativePath: string, displayPath: string): v
 
 function getAtReferenceRange(document: vscode.TextDocument, position: vscode.Position): vscode.Range | undefined {
   const linePrefix = document.lineAt(position).text.slice(0, position.character);
-  const match = /(?:^|\s)(@[\w./:?-]*)$/.exec(linePrefix);
+  const match = /(?:^|\s)(@[\w./:-]*)$/.exec(linePrefix);
   if (!match || match.index === undefined) {
     return undefined;
   }

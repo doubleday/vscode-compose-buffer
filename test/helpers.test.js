@@ -36,43 +36,65 @@ const pathIndex = createPathIndex([
   '.images/2026-07-06T08-00-21-566Z.png',
   '.images/2026-07-06T08-31-31-779Z.png',
   'src/features/auth/LoginController.ts',
+  'src/features/auth/LoginControllerTest.ts',
   'src/features/billing/InvoiceService.ts',
   'src/extension.ts'
 ]);
 
 assert.deepEqual(
-  searchPathIndex(pathIndex, parsePathCompletionQuery('src/features/auth'), 10),
-  ['src/features/auth/LoginController.ts']
+  searchPathIndex(pathIndex, parsePathCompletionQuery('src/features/auth'), 10).slice(0, 2),
+  [
+    'src/features/auth/LoginController.ts',
+    'src/features/auth/LoginControllerTest.ts'
+  ]
 );
 assert.deepEqual(
   searchPathIndex(pathIndex, parsePathCompletionQuery('openspec/changes/add-login/'), 10),
   ['openspec/changes/add-login/plan.md']
 );
 assert.deepEqual(
-  searchPathIndex(pathIndex, parsePathCompletionQuery('f:Login'), 10),
-  ['src/features/auth/LoginController.ts']
+  searchPathIndex(pathIndex, parsePathCompletionQuery('sfa'), 10).slice(0, 2),
+  [
+    'src/features/auth/LoginController.ts',
+    'src/features/auth/LoginControllerTest.ts'
+  ]
+);
+assert.deepEqual(
+  searchPathIndex(pathIndex, parsePathCompletionQuery('f:lct'), 10).slice(0, 2),
+  [
+    'src/features/auth/LoginControllerTest.ts',
+    'src/features/auth/LoginController.ts'
+  ]
 );
 assert.deepEqual(
   searchPathIndex(pathIndex, parsePathCompletionQuery('d:add'), 10),
   ['openspec/changes/add-login']
 );
 assert.deepEqual(
-  searchPathIndex(pathIndex, parsePathCompletionQuery('?:lctr'), 10),
-  ['src/features/auth/LoginController.ts']
+  searchPathIndex(pathIndex, parsePathCompletionQuery('d:adlog'), 10),
+  ['openspec/changes/add-login']
+);
+assert.deepEqual(
+  searchPathIndex(pathIndex, parsePathCompletionQuery('d:opadd'), 10),
+  []
 );
 assert.equal(
-  searchPathIndex(pathIndex, parsePathCompletionQuery('?:08-31'), 10)[0],
+  searchPathIndex(pathIndex, parsePathCompletionQuery('lctr'), 10)[0],
+  'src/features/auth/LoginController.ts'
+);
+assert.equal(
+  searchPathIndex(pathIndex, parsePathCompletionQuery('08-31'), 10)[0],
   '.images/2026-07-06T08-31-31-779Z.png'
 );
 assert.deepEqual(
-  searchPathIndex(pathIndex, parsePathCompletionQuery('?:2026'), 10).slice(0, 2),
+  searchPathIndex(pathIndex, parsePathCompletionQuery('2026'), 10).slice(0, 2),
   [
     '.images/2026-07-06T08-00-21-566Z.png',
     '.images/2026-07-06T08-31-31-779Z.png'
   ]
 );
 assert.deepEqual(
-  searchPathIndex(pathIndex, parsePathCompletionQuery('?:zz'), 10),
+  searchPathIndex(pathIndex, parsePathCompletionQuery('zz'), 10),
   []
 );
 
