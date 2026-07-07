@@ -7,6 +7,24 @@
       "group": "build",
       "problemMatcher": "$tsc",
       "label": "npm: compile"
+    },
+    {
+      "label": "debug: copy path completion fixtures",
+      "type": "process",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/scripts/prepare-fixture-workspace.js"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "debug: prepare fixture workspace",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "npm: compile",
+        "debug: copy path completion fixtures"
+      ],
+      "problemMatcher": []
     }
   ]
 }
