@@ -1,55 +1,33 @@
-import * as fs from 'fs/promises';
-import * as os from 'os';
-import * as path from 'path';
 import * as vscode from 'vscode';
 import { AgentCompletionConfig } from './agentCompletions';
 import { AgentCompletionProvider } from './agentCompletionProvider';
+import { ComposeBufferSession } from './composeBufferSession';
 import {
-  CommitBehavior,
   ImageReferenceStyle,
-  normalizeImageDirectory,
-  shouldSendToTerminal
+  normalizeImageDirectory
 } from './helpers';
 import { ImagePasteProvider, imagePasteMimeTypes } from './imagePasteProvider';
 import { WorkspaceFileCompletionProvider, pathCompletionTriggerCharacters } from './pathCompletionProvider';
 import { WorkspacePathIndex } from './workspacePathIndex';
 
 const languageId = 'compose-buffer';
-const contextKey = 'composeBuffer.active';
-const lastPromptKey = 'composeBuffer.lastPrompt';
 const fileCompletionLimit = 200;
 
-let activeBufferUri: vscode.Uri | undefined;
-let capturedTerminal: vscode.Terminal | undefined;
-let lastTerminal: vscode.Terminal | undefined;
-let extensionContext: vscode.ExtensionContext | undefined;
 const workspacePathIndex = new WorkspacePathIndex();
 
 export function activate(context: vscode.ExtensionContext) {
-  extensionContext = context;
-  lastTerminal = vscode.window.activeTerminal;
+  const session = new ComposeBufferSession(context, languageId);
 
   context.subscriptions.push(
-    vscode.window.onDidChangeActiveTerminal((terminal) => {
-      if (terminal) {
-        lastTerminal = terminal;
-      }
-    }),
-    vscode.window.onDidCloseTerminal((terminal) => {
-      if (terminal === capturedTerminal) {
-        capturedTerminal = undefined;
-      }
-      if (terminal === lastTerminal) {
-        lastTerminal = undefined;
-      }
-    }),
-    vscode.window.onDidChangeActiveTextEditor(() => updateActiveContext()),
-    vscode.commands.registerCommand('composeBuffer.open', openComposeBuffer),
-    vscode.commands.registerCommand('composeBuffer.restoreLastPrompt', restoreLastPrompt),
-    vscode.commands.registerCommand('composeBuffer.restoreLastPromptFromTerminal', restoreLastPromptFromTerminal),
-    vscode.commands.registerCommand('composeBuffer.commit', () => commitComposeBuffer(false)),
-    vscode.commands.registerCommand('composeBuffer.copyOnly', () => commitComposeBuffer(true)),
-    vscode.commands.registerCommand('composeBuffer.cancel', cancelComposeBuffer),
+    vscode.window.onDidChangeActiveTerminal(session.handleActiveTerminalChanged),
+    vscode.window.onDidCloseTerminal(session.handleTerminalClosed),
+    vscode.window.onDidChangeActiveTextEditor(session.updateActiveContext),
+    vscode.commands.registerCommand('composeBuffer.open', session.open),
+    vscode.commands.registerCommand('composeBuffer.restoreLastPrompt', session.restoreLastPrompt),
+    vscode.commands.registerCommand('composeBuffer.restoreLastPromptFromTerminal', session.restoreLastPromptFromTerminal),
+    vscode.commands.registerCommand('composeBuffer.commit', session.commit),
+    vscode.commands.registerCommand('composeBuffer.copyOnly', session.copyOnly),
+    vscode.commands.registerCommand('composeBuffer.cancel', session.cancel),
     vscode.commands.registerCommand('composeBuffer.rebuildFileIndex', workspacePathIndex.rebuild),
     vscode.languages.registerCompletionItemProvider(
       { language: languageId },
@@ -65,8 +43,8 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.languages.registerDocumentPasteEditProvider(
       { language: languageId },
       new ImagePasteProvider({
-        isComposeBuffer,
-        getPreferredImageRoot,
+        isComposeBuffer: session.isComposeBuffer,
+        getPreferredImageRoot: session.getPreferredImageRoot,
         getImageDirectory,
         getImageReferenceStyle
       }),
@@ -77,174 +55,11 @@ export function activate(context: vscode.ExtensionContext) {
     )
   );
 
-  updateActiveContext();
+  session.updateActiveContext();
 }
 
 export function deactivate() {
   return undefined;
-}
-
-async function openComposeBuffer() {
-  return openComposeBufferWithText();
-}
-
-async function openComposeBufferWithText(text?: string) {
-  capturedTerminal = vscode.window.activeTerminal ?? lastTerminal;
-
-  if (activeBufferUri) {
-    const existing = vscode.workspace.textDocuments.find((document) => document.uri.toString() === activeBufferUri?.toString());
-    if (existing) {
-      await vscode.window.showTextDocument(existing, { preview: false });
-      if (text !== undefined) {
-        await replaceDocumentText(existing, text);
-      }
-      await enterVimInsertMode();
-      await updateActiveContext();
-      return;
-    }
-  }
-
-  const fileName = `compose-buffer-${Date.now()}.compose.md`;
-  const filePath = path.join(os.tmpdir(), fileName);
-  await fs.writeFile(filePath, text ?? '', 'utf8');
-
-  activeBufferUri = vscode.Uri.file(filePath);
-  const document = await vscode.workspace.openTextDocument(activeBufferUri);
-  await vscode.languages.setTextDocumentLanguage(document, languageId);
-  await vscode.window.showTextDocument(document, { preview: false });
-  await enterVimInsertMode();
-  await updateActiveContext();
-}
-
-async function restoreLastPrompt() {
-  const lastPrompt = getLastPrompt();
-  if (lastPrompt === undefined) {
-    await vscode.window.showInformationMessage('Compose Buffer has no saved prompt yet.');
-    return;
-  }
-
-  await openComposeBufferWithText(lastPrompt);
-}
-
-async function restoreLastPromptFromTerminal() {
-  const terminal = vscode.window.activeTerminal ?? lastTerminal;
-  if (terminal) {
-    terminal.sendText('\u0003', false);
-  }
-
-  await restoreLastPrompt();
-}
-
-async function commitComposeBuffer(copyOnly: boolean) {
-  const document = await getActiveBufferDocument();
-  if (!document) {
-    return;
-  }
-
-  const text = document.getText();
-  await saveLastPrompt(text);
-  await vscode.env.clipboard.writeText(text);
-
-  const behavior = getCommitBehavior();
-  const terminal = capturedTerminal ?? lastTerminal;
-  const shouldSend = !copyOnly && shouldSendToTerminal(behavior, Boolean(terminal)) && terminal;
-
-  await closeAndDeleteBuffer(document);
-
-  if (shouldSend) {
-    terminal.show(false);
-    terminal.sendText(text, false);
-    await vscode.commands.executeCommand('workbench.action.terminal.focus');
-  }
-}
-
-async function cancelComposeBuffer() {
-  const document = await getActiveBufferDocument();
-  if (!document) {
-    return;
-  }
-
-  await saveLastPrompt(document.getText());
-
-  const terminal = capturedTerminal ?? lastTerminal;
-  await closeAndDeleteBuffer(document);
-
-  if (terminal) {
-    terminal.show(false);
-    await vscode.commands.executeCommand('workbench.action.terminal.focus');
-  }
-}
-
-async function replaceDocumentText(document: vscode.TextDocument, text: string) {
-  const editor = await vscode.window.showTextDocument(document, { preview: false });
-  const fullRange = new vscode.Range(
-    document.positionAt(0),
-    document.positionAt(document.getText().length)
-  );
-  await editor.edit((editBuilder) => {
-    editBuilder.replace(fullRange, text);
-  });
-}
-
-function getLastPrompt(): string | undefined {
-  return extensionContext?.globalState.get<string>(lastPromptKey);
-}
-
-async function saveLastPrompt(text: string) {
-  if (extensionContext && text.length > 0) {
-    await extensionContext.globalState.update(lastPromptKey, text);
-  }
-}
-
-async function getActiveBufferDocument(): Promise<vscode.TextDocument | undefined> {
-  const activeDocument = vscode.window.activeTextEditor?.document;
-  if (isComposeBuffer(activeDocument)) {
-    return activeDocument;
-  }
-
-  if (!activeBufferUri) {
-    return undefined;
-  }
-
-  return vscode.workspace.textDocuments.find((document) => document.uri.toString() === activeBufferUri?.toString());
-}
-
-async function closeAndDeleteBuffer(document: vscode.TextDocument) {
-  await vscode.window.showTextDocument(document, { preview: false });
-  await document.save();
-  await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
-
-  const uri = document.uri;
-  activeBufferUri = undefined;
-  capturedTerminal = undefined;
-  await updateActiveContext();
-
-  try {
-    await fs.unlink(uri.fsPath);
-  } catch {
-    // Temp-file cleanup is best effort.
-  }
-}
-
-function isComposeBuffer(document: vscode.TextDocument | undefined): boolean {
-  return Boolean(document && activeBufferUri && document.uri.toString() === activeBufferUri.toString());
-}
-
-async function updateActiveContext() {
-  await vscode.commands.executeCommand('setContext', contextKey, isComposeBuffer(vscode.window.activeTextEditor?.document));
-}
-
-async function enterVimInsertMode() {
-  const commands = await vscode.commands.getCommands(true);
-  if (commands.includes('extension.vim_insert')) {
-    await vscode.commands.executeCommand('extension.vim_insert');
-  }
-}
-
-function getCommitBehavior(): CommitBehavior {
-  return vscode.workspace
-    .getConfiguration('composeBuffer')
-    .get<CommitBehavior>('commitBehavior', 'copyAndPaste');
 }
 
 function getImageReferenceStyle(): ImageReferenceStyle {
@@ -263,13 +78,4 @@ function getAgentCompletions(): AgentCompletionConfig {
   return vscode.workspace
     .getConfiguration('composeBuffer')
     .get<AgentCompletionConfig>('agentCompletions', []);
-}
-
-function getPreferredImageRoot(): vscode.Uri | undefined {
-  const cwd = capturedTerminal?.shellIntegration?.cwd ?? lastTerminal?.shellIntegration?.cwd;
-  if (cwd && vscode.workspace.getWorkspaceFolder(cwd)) {
-    return cwd;
-  }
-
-  return vscode.workspace.workspaceFolders?.[0]?.uri;
 }
