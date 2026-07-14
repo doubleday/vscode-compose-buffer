@@ -8,27 +8,22 @@ import {
   CommitBehavior,
   ImageReferenceStyle,
   normalizeImageDirectory,
-  normalizeWorkspacePath,
   shouldSendToTerminal
 } from './helpers';
 import { ImagePasteProvider, imagePasteMimeTypes } from './imagePasteProvider';
 import { WorkspaceFileCompletionProvider, pathCompletionTriggerCharacters } from './pathCompletionProvider';
-import { PathIndex, createPathIndex } from './pathIndex';
+import { WorkspacePathIndex } from './workspacePathIndex';
 
 const languageId = 'compose-buffer';
 const contextKey = 'composeBuffer.active';
 const lastPromptKey = 'composeBuffer.lastPrompt';
 const fileCompletionLimit = 200;
-const fileIndexLimit = 50000;
-const fileSearchExclude = '**/{.git,node_modules,dist,out,build,coverage}/**';
 
 let activeBufferUri: vscode.Uri | undefined;
 let capturedTerminal: vscode.Terminal | undefined;
 let lastTerminal: vscode.Terminal | undefined;
 let extensionContext: vscode.ExtensionContext | undefined;
-let workspacePathIndex: PathIndex | undefined;
-let workspacePathIndexPromise: Promise<PathIndex> | undefined;
-let workspacePathIndexTruncated = false;
+const workspacePathIndex = new WorkspacePathIndex();
 
 export function activate(context: vscode.ExtensionContext) {
   extensionContext = context;
@@ -55,10 +50,10 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('composeBuffer.commit', () => commitComposeBuffer(false)),
     vscode.commands.registerCommand('composeBuffer.copyOnly', () => commitComposeBuffer(true)),
     vscode.commands.registerCommand('composeBuffer.cancel', cancelComposeBuffer),
-    vscode.commands.registerCommand('composeBuffer.rebuildFileIndex', rebuildWorkspacePathIndex),
+    vscode.commands.registerCommand('composeBuffer.rebuildFileIndex', workspacePathIndex.rebuild),
     vscode.languages.registerCompletionItemProvider(
       { language: languageId },
-      new WorkspaceFileCompletionProvider(getWorkspacePathIndex, fileCompletionLimit),
+      new WorkspaceFileCompletionProvider(workspacePathIndex.getIndex, fileCompletionLimit),
       ...pathCompletionTriggerCharacters
     ),
     vscode.languages.registerCompletionItemProvider(
@@ -268,46 +263,6 @@ function getAgentCompletions(): AgentCompletionConfig {
   return vscode.workspace
     .getConfiguration('composeBuffer')
     .get<AgentCompletionConfig>('agentCompletions', []);
-}
-
-async function rebuildWorkspacePathIndex() {
-  workspacePathIndex = undefined;
-  workspacePathIndexPromise = undefined;
-  workspacePathIndexTruncated = false;
-
-  if (!vscode.workspace.workspaceFolders?.length) {
-    await vscode.window.showInformationMessage('Compose Buffer file index skipped because no workspace is open.');
-    return;
-  }
-
-  await getWorkspacePathIndex();
-  const suffix = workspacePathIndexTruncated ? ` The first ${fileIndexLimit} files were indexed.` : '';
-  await vscode.window.showInformationMessage(`Compose Buffer file index rebuilt.${suffix}`);
-}
-
-async function getWorkspacePathIndex(token?: vscode.CancellationToken): Promise<PathIndex> {
-  if (workspacePathIndex) {
-    return workspacePathIndex;
-  }
-
-  if (!workspacePathIndexPromise) {
-    workspacePathIndexPromise = buildWorkspacePathIndex(token);
-  }
-
-  try {
-    workspacePathIndex = await workspacePathIndexPromise;
-    return workspacePathIndex;
-  } catch (error) {
-    workspacePathIndexPromise = undefined;
-    throw error;
-  }
-}
-
-async function buildWorkspacePathIndex(token?: vscode.CancellationToken): Promise<PathIndex> {
-  const files = await vscode.workspace.findFiles('**/*', fileSearchExclude, fileIndexLimit, token);
-  workspacePathIndexTruncated = files.length >= fileIndexLimit;
-  const paths = files.map((uri) => normalizeWorkspacePath(vscode.workspace.asRelativePath(uri, false)));
-  return createPathIndex(paths);
 }
 
 function getPreferredImageRoot(): vscode.Uri | undefined {
