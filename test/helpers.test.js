@@ -15,6 +15,46 @@ const {
   searchPathIndex,
   searchPathIndexWithTypes
 } = require('../dist/pathIndex');
+const {
+  dedupeAgentCompletions,
+  getAgentCompletionMatchScore,
+  getFuzzyMatchScore,
+  normalizeAgentCompletions
+} = require('../dist/agentCompletions');
+
+assert.deepEqual(
+  normalizeAgentCompletions([' review ', '/deploy', '$skill'], '$'),
+  [
+    { alias: '$review', insertText: '$review' },
+    { alias: '$skill', insertText: '$skill' }
+  ]
+);
+assert.deepEqual(
+  normalizeAgentCompletions({ rev: ['review', '$review'], '/ship': '/deploy' }, '/'),
+  [
+    { alias: '/rev', insertText: '/review' },
+    { alias: '/ship', insertText: '/deploy' }
+  ]
+);
+assert.deepEqual(
+  dedupeAgentCompletions([
+    { alias: '$review', insertText: '$review' },
+    { alias: '$review', insertText: '$review' },
+    { alias: '$review', insertText: '$review-code' }
+  ]),
+  [
+    { alias: '$review', insertText: '$review' },
+    { alias: '$review', insertText: '$review-code' }
+  ]
+);
+assert.equal(getFuzzyMatchScore('rev', 'review'), 3);
+assert.equal(getFuzzyMatchScore('view', 'review'), 52);
+assert.equal(getFuzzyMatchScore('rvw', 'review'), 103);
+assert.equal(getFuzzyMatchScore('xyz', 'review'), undefined);
+assert.equal(
+  getAgentCompletionMatchScore('deploy', { alias: '/ship', insertText: '/deploy-production' }),
+  10
+);
 
 assert.equal(normalizeWorkspacePath('src\\extension.ts'), 'src/extension.ts');
 assert.equal(normalizeImageDirectory(' /tmp/images/ '), 'tmp/images');
