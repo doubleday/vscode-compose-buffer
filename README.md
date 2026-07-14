@@ -16,7 +16,7 @@ While the compose buffer is active, `Ctrl+Enter` and `Esc` commit it. With termi
 ## Features
 
 - `@` file completions insert workspace-relative references using a session-local file index.
-- Plain `@` searches fuzzy matches across workspace-relative paths.
+- Plain `@` searches fuzzy matches across workspace-relative files and directories.
 - `@f:` searches fuzzy matches on file names, and `@d:` searches fuzzy matches on directory names without matching across path separators.
 - `$` and `/` completions can suggest configured agent skills or commands.
 - Pasted images are written to `.images/` by default and inserted as `@.images/<timestamp>.png`.
@@ -35,6 +35,8 @@ Use the narrowest operator that matches what you know:
 ```
 
 Directory completions insert a trailing slash so you can continue narrowing, for example `@d:add-login` can insert `@openspec/changes/add-login/`, then you can type `plan` to complete `plan.md`.
+
+See [Path Completion Ranking](docs/path-completion-ranking.md) for the matching and ordering specification.
 
 Manual path-completion fixtures live under `test/assets/path-completions`. Try `@f:proposal` to test repeated OpenSpec-style filenames, or `@f:2026` to test timestamp-like image names.
 

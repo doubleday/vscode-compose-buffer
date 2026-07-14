@@ -6,18 +6,18 @@ import {
   CommitBehavior,
   ImageReferenceStyle,
   createImageFileName,
+  formatPathTail,
   formatImageReference,
   normalizeImageDirectory,
   normalizeWorkspacePath,
   shouldSendToTerminal
 } from './helpers';
 import {
-  PathCompletionQuery,
   PathIndex,
   createPathIndex,
   getShortestUniquePathSuffix,
   parsePathCompletionQuery,
-  searchPathIndex
+  searchPathIndexWithTypes
 } from './pathIndex';
 
 const languageId = 'compose-buffer';
@@ -26,6 +26,7 @@ const lastPromptKey = 'composeBuffer.lastPrompt';
 const fileCompletionLimit = 200;
 const fileIndexLimit = 50000;
 const fileSearchExclude = '**/{.git,node_modules,dist,out,build,coverage}/**';
+const pathCompletionDetailLimit = 28;
 const pathCompletionTriggerCharacters = [
   '@',
   ':',
@@ -319,10 +320,18 @@ class WorkspaceFileCompletionProvider implements vscode.CompletionItemProvider {
 
     const referenceText = document.getText(range);
     const query = parsePathCompletionQuery(referenceText.slice(1));
-    const paths = searchPathIndex(index, query, fileCompletionLimit);
-    const items = paths.map((relativePath, index) => {
-      const displayPath = getShortestUniquePathSuffix(relativePath, paths);
-      return createPathCompletionItem(relativePath, displayPath, query, range, referenceText, index);
+    const results = searchPathIndexWithTypes(index, query, fileCompletionLimit);
+    const paths = results.map((result) => result.path);
+    const items = results.map((result, index) => {
+      const displayPath = getShortestUniquePathSuffix(result.path, paths);
+      return createPathCompletionItem(
+        result.path,
+        displayPath,
+        result.isDirectory,
+        range,
+        referenceText,
+        index
+      );
     });
 
     return new vscode.CompletionList(items, true);
@@ -372,12 +381,11 @@ async function buildWorkspacePathIndex(token?: vscode.CancellationToken): Promis
 function createPathCompletionItem(
   relativePath: string,
   displayPath: string,
-  query: PathCompletionQuery,
+  isDirectory: boolean,
   range: vscode.Range,
   referenceText: string,
   index: number
 ): vscode.CompletionItem {
-  const isDirectory = query.mode === 'directory';
   const insertedPath = isDirectory ? `${relativePath}/` : relativePath;
   const labelPath = isDirectory ? `${displayPath}/` : displayPath;
   const item = new vscode.CompletionItem(
@@ -398,8 +406,7 @@ function createPathCompletionLabel(relativePath: string, displayPath: string): v
 
   return {
     label: `@${displayPath}`,
-    detail: detail ? ` ${detail}` : undefined,
-    description: relativePath
+    detail: detail ? ` ${formatPathTail(detail, pathCompletionDetailLimit)}` : undefined
   };
 }
 

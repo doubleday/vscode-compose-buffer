@@ -25,3 +25,17 @@ export function formatImageReference(relativePath: string, style: ImageReference
 export function shouldSendToTerminal(behavior: CommitBehavior, hasTerminal: boolean): boolean {
   return behavior === 'copyAndPaste' && hasTerminal;
 }
+
+export function formatPathTail(filePath: string, maxLength: number): string {
+  const normalized = normalizeWorkspacePath(filePath).replace(/\/+$/, '');
+  if (maxLength <= 0) {
+    return '';
+  }
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+  if (maxLength <= 3) {
+    return '.'.repeat(maxLength);
+  }
+  return `...${normalized.slice(-(maxLength - 3))}`;
+}

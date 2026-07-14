@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 
 const {
   createImageFileName,
+  formatPathTail,
   formatImageReference,
   normalizeImageDirectory,
   normalizeWorkspacePath,
@@ -11,7 +12,8 @@ const {
   createPathIndex,
   getShortestUniquePathSuffix,
   parsePathCompletionQuery,
-  searchPathIndex
+  searchPathIndex,
+  searchPathIndexWithTypes
 } = require('../dist/pathIndex');
 
 assert.equal(normalizeWorkspacePath('src\\extension.ts'), 'src/extension.ts');
@@ -30,6 +32,12 @@ assert.equal(shouldSendToTerminal('copyAndPaste', true), true);
 assert.equal(shouldSendToTerminal('copyAndPaste', false), false);
 assert.equal(shouldSendToTerminal('copyOnly', true), false);
 
+assert.equal(formatPathTail('openspec/changes/add-billing/', 40), 'openspec/changes/add-billing');
+assert.equal(
+  formatPathTail('test/assets/path-completions/openspec/changes/add-billing/', 28),
+  '...nspec/changes/add-billing'
+);
+
 const pathIndex = createPathIndex([
   'openspec/changes/add-login/plan.md',
   'openspec/specs/auth/plan.md',
@@ -44,13 +52,20 @@ const pathIndex = createPathIndex([
 assert.deepEqual(
   searchPathIndex(pathIndex, parsePathCompletionQuery('src/features/auth'), 10).slice(0, 2),
   [
-    'src/features/auth/LoginController.ts',
-    'src/features/auth/LoginControllerTest.ts'
+    'src/features/auth',
+    'src/features/auth/LoginController.ts'
   ]
 );
 assert.deepEqual(
   searchPathIndex(pathIndex, parsePathCompletionQuery('openspec/changes/add-login/'), 10),
   ['openspec/changes/add-login/plan.md']
+);
+assert.deepEqual(
+  searchPathIndexWithTypes(pathIndex, parsePathCompletionQuery('openspec/ch'), 10).slice(0, 2),
+  [
+    { path: 'openspec/changes', isDirectory: true },
+    { path: 'openspec/changes/add-login', isDirectory: true }
+  ]
 );
 assert.deepEqual(
   searchPathIndex(pathIndex, parsePathCompletionQuery('sfa'), 10).slice(0, 2),
@@ -96,6 +111,78 @@ assert.deepEqual(
 assert.deepEqual(
   searchPathIndex(pathIndex, parsePathCompletionQuery('zz'), 10),
   []
+);
+
+const namingStyleIndex = createPathIndex([
+  'src/differential-pipeline-wrapper.ts',
+  'src/DifferentialPipelineWrapper.ts'
+]);
+
+for (const query of ['f:dpw', 'f:DPW', 'f:DiPiW']) {
+  assert.deepEqual(
+    searchPathIndex(namingStyleIndex, parsePathCompletionQuery(query), 10).slice(0, 2),
+    [
+      'src/DifferentialPipelineWrapper.ts',
+      'src/differential-pipeline-wrapper.ts'
+    ]
+  );
+}
+
+assert.deepEqual(
+  searchPathIndex(namingStyleIndex, parsePathCompletionQuery('dpw'), 10),
+  [
+    'src/DifferentialPipelineWrapper.ts',
+    'src/differential-pipeline-wrapper.ts'
+  ]
+);
+
+const structuredPathIndex = createPathIndex([
+  'first/second/third.md',
+  'first/something-deep/third.md'
+]);
+
+assert.deepEqual(
+  searchPathIndex(structuredPathIndex, parsePathCompletionQuery('/fi/sd/t'), 10),
+  [
+    'first/something-deep/third.md',
+    'first/second/third.md'
+  ]
+);
+
+assert.deepEqual(
+  searchPathIndex(structuredPathIndex, parsePathCompletionQuery('/fi/missing/t'), 10),
+  []
+);
+
+const mixedPathResults = searchPathIndexWithTypes(
+  createPathIndex([
+    'openspec/changes/add-billing/proposal.md',
+    'openspec/changes/add-billing/plan.md',
+    '.images/ab-archive.png'
+  ]),
+  parsePathCompletionQuery('ab'),
+  10
+);
+assert.deepEqual(
+  mixedPathResults.slice(0, 4),
+  [
+    { path: 'openspec/changes/add-billing', isDirectory: true },
+    { path: '.images/ab-archive.png', isDirectory: false },
+    { path: 'openspec/changes/add-billing/plan.md', isDirectory: false },
+    { path: 'openspec/changes/add-billing/proposal.md', isDirectory: false }
+  ]
+);
+
+assert.deepEqual(
+  searchPathIndexWithTypes(
+    createPathIndex(['add-billing.md', 'add-billing/child.txt']),
+    parsePathCompletionQuery('ab'),
+    2
+  ),
+  [
+    { path: 'add-billing.md', isDirectory: false },
+    { path: 'add-billing', isDirectory: true }
+  ]
 );
 
 const repeatedProposalPaths = [
