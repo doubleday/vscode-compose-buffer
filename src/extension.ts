@@ -7,12 +7,11 @@ import { AgentCompletionProvider } from './agentCompletionProvider';
 import {
   CommitBehavior,
   ImageReferenceStyle,
-  createImageFileName,
-  formatImageReference,
   normalizeImageDirectory,
   normalizeWorkspacePath,
   shouldSendToTerminal
 } from './helpers';
+import { ImagePasteProvider, imagePasteMimeTypes } from './imagePasteProvider';
 import { WorkspaceFileCompletionProvider, pathCompletionTriggerCharacters } from './pathCompletionProvider';
 import { PathIndex, createPathIndex } from './pathIndex';
 
@@ -70,10 +69,15 @@ export function activate(context: vscode.ExtensionContext) {
     ),
     vscode.languages.registerDocumentPasteEditProvider(
       { language: languageId },
-      new ImagePasteProvider(),
+      new ImagePasteProvider({
+        isComposeBuffer,
+        getPreferredImageRoot,
+        getImageDirectory,
+        getImageReferenceStyle
+      }),
       {
         providedPasteEditKinds: [vscode.DocumentDropOrPasteEditKind.Text],
-        pasteMimeTypes: ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
+        pasteMimeTypes: imagePasteMimeTypes
       }
     )
   );
@@ -304,78 +308,6 @@ async function buildWorkspacePathIndex(token?: vscode.CancellationToken): Promis
   workspacePathIndexTruncated = files.length >= fileIndexLimit;
   const paths = files.map((uri) => normalizeWorkspacePath(vscode.workspace.asRelativePath(uri, false)));
   return createPathIndex(paths);
-}
-
-class ImagePasteProvider implements vscode.DocumentPasteEditProvider {
-  async provideDocumentPasteEdits(
-    document: vscode.TextDocument,
-    ranges: readonly vscode.Range[],
-    dataTransfer: vscode.DataTransfer,
-    _context: vscode.DocumentPasteEditContext,
-    token: vscode.CancellationToken
-  ): Promise<vscode.DocumentPasteEdit[] | undefined> {
-    if (!isComposeBuffer(document)) {
-      return undefined;
-    }
-
-    const image = getFirstImage(dataTransfer);
-    if (!image) {
-      return undefined;
-    }
-
-    const file = image.asFile();
-    if (!file) {
-      return undefined;
-    }
-
-    const bytes = await file.data();
-    if (token.isCancellationRequested) {
-      return undefined;
-    }
-
-    const target = getImageTarget();
-    if (!target) {
-      return undefined;
-    }
-
-    await vscode.workspace.fs.createDirectory(target.directory);
-    await vscode.workspace.fs.writeFile(target.file, bytes);
-
-    const edit = new vscode.DocumentPasteEdit(
-      formatImageReference(target.referencePath, getImageReferenceStyle()),
-      'Insert pasted image reference',
-      vscode.DocumentDropOrPasteEditKind.Text
-    );
-
-    return ranges.length ? [edit] : undefined;
-  }
-}
-
-function getFirstImage(dataTransfer: vscode.DataTransfer): vscode.DataTransferItem | undefined {
-  for (const mime of ['image/png', 'image/jpeg', 'image/gif', 'image/webp']) {
-    const item = dataTransfer.get(mime);
-    if (item) {
-      return item;
-    }
-  }
-
-  return undefined;
-}
-
-function getImageTarget(): { directory: vscode.Uri; file: vscode.Uri; referencePath: string } | undefined {
-  const root = getPreferredImageRoot();
-  if (!root) {
-    return undefined;
-  }
-
-  const imageDirectory = getImageDirectory();
-  const directory = vscode.Uri.joinPath(root, ...imageDirectory.split('/'));
-  const fileName = createImageFileName();
-  return {
-    directory,
-    file: vscode.Uri.joinPath(directory, fileName),
-    referencePath: `${imageDirectory}/${fileName}`
-  };
 }
 
 function getPreferredImageRoot(): vscode.Uri | undefined {
