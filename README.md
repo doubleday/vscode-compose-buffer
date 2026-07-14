@@ -5,11 +5,13 @@ A minimal VS Code extension that opens a native editor as a compose buffer for t
 ## Commands
 
 - `Compose Buffer: Open` opens or reveals the buffer and captures the active terminal.
+- `Compose Buffer: Restore Last Prompt` opens or reveals the buffer filled with the last committed or canceled prompt.
+- `Compose Buffer: Restore Last Prompt From Terminal` sends `Ctrl+C` to the active terminal, then restores the last prompt.
 - `Compose Buffer: Commit` copies the buffer to the clipboard and sends it to the captured terminal.
 - `Compose Buffer: Copy Only` copies the buffer without sending it to a terminal.
 - `Compose Buffer: Cancel` closes the buffer without copying.
 
-While the compose buffer is active, `Ctrl+Enter` and `Esc` commit it.
+While the compose buffer is active, `Ctrl+Enter` and `Esc` commit it. With terminal focus, `Ctrl+C` restores the last prompt unless terminal text is selected.
 
 ## Features
 

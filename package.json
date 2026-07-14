@@ -18,6 +18,8 @@
   ],
   "activationEvents": [
     "onCommand:composeBuffer.open",
+    "onCommand:composeBuffer.restoreLastPrompt",
+    "onCommand:composeBuffer.restoreLastPromptFromTerminal",
     "onCommand:composeBuffer.rebuildFileIndex",
     "onLanguage:compose-buffer"
   ],
@@ -33,6 +35,14 @@
       {
         "command": "composeBuffer.open",
         "title": "Compose Buffer: Open"
+      },
+      {
+        "command": "composeBuffer.restoreLastPrompt",
+        "title": "Compose Buffer: Restore Last Prompt"
+      },
+      {
+        "command": "composeBuffer.restoreLastPromptFromTerminal",
+        "title": "Compose Buffer: Restore Last Prompt From Terminal"
       },
       {
         "command": "composeBuffer.commit",
@@ -123,6 +133,12 @@
         "command": "composeBuffer.cancel",
         "key": "shift+escape",
         "when": "composeBuffer.active && editorTextFocus"
+      },
+      {
+        "command": "composeBuffer.restoreLastPromptFromTerminal",
+        "key": "ctrl+c",
+        "mac": "ctrl+c",
+        "when": "terminalFocus && !terminalTextSelected"
       }
     ],
     "languages": [
@@ -147,6 +163,12 @@
       "commandPalette": [
         {
           "command": "composeBuffer.open"
+        },
+        {
+          "command": "composeBuffer.restoreLastPrompt"
+        },
+        {
+          "command": "composeBuffer.restoreLastPromptFromTerminal"
         },
         {
           "command": "composeBuffer.commit",

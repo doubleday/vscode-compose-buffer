@@ -22,6 +22,7 @@ import {
 
 const languageId = 'compose-buffer';
 const contextKey = 'composeBuffer.active';
+const lastPromptKey = 'composeBuffer.lastPrompt';
 const fileCompletionLimit = 200;
 const fileIndexLimit = 50000;
 const fileSearchExclude = '**/{.git,node_modules,dist,out,build,coverage}/**';
@@ -51,11 +52,13 @@ type AgentCompletionReference = {
 let activeBufferUri: vscode.Uri | undefined;
 let capturedTerminal: vscode.Terminal | undefined;
 let lastTerminal: vscode.Terminal | undefined;
+let extensionContext: vscode.ExtensionContext | undefined;
 let workspacePathIndex: PathIndex | undefined;
 let workspacePathIndexPromise: Promise<PathIndex> | undefined;
 let workspacePathIndexTruncated = false;
 
 export function activate(context: vscode.ExtensionContext) {
+  extensionContext = context;
   lastTerminal = vscode.window.activeTerminal;
 
   context.subscriptions.push(
@@ -74,6 +77,8 @@ export function activate(context: vscode.ExtensionContext) {
     }),
     vscode.window.onDidChangeActiveTextEditor(() => updateActiveContext()),
     vscode.commands.registerCommand('composeBuffer.open', openComposeBuffer),
+    vscode.commands.registerCommand('composeBuffer.restoreLastPrompt', restoreLastPrompt),
+    vscode.commands.registerCommand('composeBuffer.restoreLastPromptFromTerminal', restoreLastPromptFromTerminal),
     vscode.commands.registerCommand('composeBuffer.commit', () => commitComposeBuffer(false)),
     vscode.commands.registerCommand('composeBuffer.copyOnly', () => commitComposeBuffer(true)),
     vscode.commands.registerCommand('composeBuffer.cancel', cancelComposeBuffer),
@@ -107,12 +112,19 @@ export function deactivate() {
 }
 
 async function openComposeBuffer() {
+  return openComposeBufferWithText();
+}
+
+async function openComposeBufferWithText(text?: string) {
   capturedTerminal = vscode.window.activeTerminal ?? lastTerminal;
 
   if (activeBufferUri) {
     const existing = vscode.workspace.textDocuments.find((document) => document.uri.toString() === activeBufferUri?.toString());
     if (existing) {
       await vscode.window.showTextDocument(existing, { preview: false });
+      if (text !== undefined) {
+        await replaceDocumentText(existing, text);
+      }
       await enterVimInsertMode();
       await updateActiveContext();
       return;
@@ -121,7 +133,7 @@ async function openComposeBuffer() {
 
   const fileName = `compose-buffer-${Date.now()}.compose.md`;
   const filePath = path.join(os.tmpdir(), fileName);
-  await fs.writeFile(filePath, '', 'utf8');
+  await fs.writeFile(filePath, text ?? '', 'utf8');
 
   activeBufferUri = vscode.Uri.file(filePath);
   const document = await vscode.workspace.openTextDocument(activeBufferUri);
@@ -131,6 +143,25 @@ async function openComposeBuffer() {
   await updateActiveContext();
 }
 
+async function restoreLastPrompt() {
+  const lastPrompt = getLastPrompt();
+  if (lastPrompt === undefined) {
+    await vscode.window.showInformationMessage('Compose Buffer has no saved prompt yet.');
+    return;
+  }
+
+  await openComposeBufferWithText(lastPrompt);
+}
+
+async function restoreLastPromptFromTerminal() {
+  const terminal = vscode.window.activeTerminal ?? lastTerminal;
+  if (terminal) {
+    terminal.sendText('\u0003', false);
+  }
+
+  await restoreLastPrompt();
+}
+
 async function commitComposeBuffer(copyOnly: boolean) {
   const document = await getActiveBufferDocument();
   if (!document) {
@@ -138,6 +169,7 @@ async function commitComposeBuffer(copyOnly: boolean) {
   }
 
   const text = document.getText();
+  await saveLastPrompt(text);
   await vscode.env.clipboard.writeText(text);
 
   const behavior = getCommitBehavior();
@@ -159,12 +191,35 @@ async function cancelComposeBuffer() {
     return;
   }
 
+  await saveLastPrompt(document.getText());
+
   const terminal = capturedTerminal ?? lastTerminal;
   await closeAndDeleteBuffer(document);
 
   if (terminal) {
     terminal.show(false);
     await vscode.commands.executeCommand('workbench.action.terminal.focus');
+  }
+}
+
+async function replaceDocumentText(document: vscode.TextDocument, text: string) {
+  const editor = await vscode.window.showTextDocument(document, { preview: false });
+  const fullRange = new vscode.Range(
+    document.positionAt(0),
+    document.positionAt(document.getText().length)
+  );
+  await editor.edit((editBuilder) => {
+    editBuilder.replace(fullRange, text);
+  });
+}
+
+function getLastPrompt(): string | undefined {
+  return extensionContext?.globalState.get<string>(lastPromptKey);
+}
+
+async function saveLastPrompt(text: string) {
+  if (extensionContext && text.length > 0) {
+    await extensionContext.globalState.update(lastPromptKey, text);
   }
 }
 
