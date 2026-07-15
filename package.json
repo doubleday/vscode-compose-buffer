@@ -5,7 +5,7 @@
   "version": "0.0.7",
   "publisher": "DanielDoubleday",
   "license": "MIT",
-  "icon": "resources/compose-buffer-icon-128.png",
+  "icon": "resources/compose-buffer-icon.png",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/doubleday/vscode-compose-buffer.git"
@@ -17,10 +17,6 @@
     "Other"
   ],
   "activationEvents": [
-    "onCommand:composeBuffer.open",
-    "onCommand:composeBuffer.restoreLastPrompt",
-    "onCommand:composeBuffer.restoreLastPromptFromTerminal",
-    "onCommand:composeBuffer.rebuildFileIndex",
     "onLanguage:compose-buffer"
   ],
   "main": "./dist/extension.js",

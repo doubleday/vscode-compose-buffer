@@ -15,5 +15,3 @@ tsconfig.json
 AGENTS.md
 package-lock.json
 scripts
-resources/compose-buffer-icon.png
-resources/compose-buffer-icon-32.png
