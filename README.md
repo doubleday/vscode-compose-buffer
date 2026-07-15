@@ -11,7 +11,7 @@ A minimal VS Code extension that opens a native editor as a compose buffer for t
 - `Compose Buffer: Copy Only` copies the buffer without sending it to a terminal.
 - `Compose Buffer: Cancel` closes the buffer without copying.
 
-While the compose buffer is active, `Ctrl+Enter` and `Esc` commit it. With terminal focus, `Ctrl+C` restores the last prompt unless terminal text is selected.
+While the compose buffer is active, `Ctrl+Enter` and `Esc` commit it. With terminal focus, `Cmd+Shift+Enter` restores the last prompt on macOS unless terminal text is selected.
 
 ## Features
 
@@ -81,3 +81,9 @@ Download the `.vsix` file from the latest GitHub Release, then run:
 ```sh
 code --install-extension compose-buffer-*.vsix
 ```
+
+## Publishing
+
+Marketplace publishing is handled by the tag-based GitHub Actions release
+workflow. See [Publishing](docs/publishing.md) for the setup, token locations,
+and release commands.

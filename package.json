@@ -137,8 +137,8 @@
       },
       {
         "command": "composeBuffer.restoreLastPromptFromTerminal",
-        "key": "ctrl+c",
-        "mac": "ctrl+c",
+        "key": "ctrl+shift+enter",
+        "mac": "cmd+shift+enter",
         "when": "terminalFocus && !terminalTextSelected"
       }
     ],
