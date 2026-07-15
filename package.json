@@ -5,6 +5,7 @@
   "version": "0.0.6",
   "publisher": "DanielDoubleday",
   "license": "MIT",
+  "icon": "resources/compose-buffer-icon-128.png",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/doubleday/vscode-compose-buffer.git"
