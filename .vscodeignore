@@ -3,3 +3,14 @@ src
 test
 tsconfig.json
 *.vsix
+.cursor
+.debug
+.github
+.images
+.mcp-gw
+.mcp.json
+.vscode
+.gitignore
+AGENTS.md
+package-lock.json
+scripts
