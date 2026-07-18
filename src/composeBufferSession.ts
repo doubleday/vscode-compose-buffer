@@ -3,20 +3,23 @@ import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { CommitBehavior, shouldSendToTerminal } from './helpers';
+import { ImagePreviewPanel } from './imagePreviewPanel';
 
 const contextKey = 'composeBuffer.active';
 const lastPromptKey = 'composeBuffer.lastPrompt';
 
-export class ComposeBufferSession {
+export class ComposeBufferSession implements vscode.Disposable {
   private activeBufferUri: vscode.Uri | undefined;
   private capturedTerminal: vscode.Terminal | undefined;
   private lastTerminal: vscode.Terminal | undefined;
+  private readonly imagePreview: ImagePreviewPanel;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly languageId: string
   ) {
     this.lastTerminal = vscode.window.activeTerminal;
+    this.imagePreview = new ImagePreviewPanel();
   }
 
   readonly handleActiveTerminalChanged = (terminal: vscode.Terminal | undefined): void => {
@@ -73,6 +76,22 @@ export class ComposeBufferSession {
     await this.commitBuffer(true);
   };
 
+  readonly toggleImagePreview = (): void => {
+    if (!this.isComposeBuffer(vscode.window.activeTextEditor?.document)) {
+      return;
+    }
+    if (!this.imagePreview.hasImages) {
+      void vscode.window.showInformationMessage('Compose Buffer has no pasted images yet.');
+      return;
+    }
+
+    this.imagePreview.toggle();
+  };
+
+  dispose(): void {
+    this.imagePreview.dispose();
+  }
+
   readonly cancel = async (): Promise<void> => {
     const document = await this.getActiveBufferDocument();
     if (!document) {
@@ -105,6 +124,33 @@ export class ComposeBufferSession {
     }
 
     return vscode.workspace.workspaceFolders?.[0]?.uri;
+  };
+
+  readonly showImagePreview = async (
+    image: vscode.Uri,
+    document: vscode.TextDocument
+  ): Promise<void> => {
+    if (!this.shouldOpenImagePreview() || !this.isComposeBuffer(document)) {
+      return;
+    }
+
+    const composeEditor = vscode.window.visibleTextEditors.find(
+      (editor) => editor.document.uri.toString() === document.uri.toString()
+    );
+    if (!composeEditor) {
+      return;
+    }
+
+    try {
+      this.imagePreview.addImage(image);
+      await vscode.window.showTextDocument(document, {
+        viewColumn: composeEditor.viewColumn,
+        preview: false,
+        preserveFocus: false
+      });
+    } catch {
+      // A preview is optional and must never prevent the paste itself.
+    }
   };
 
   private async openWithText(text?: string): Promise<void> {
@@ -197,6 +243,7 @@ export class ComposeBufferSession {
   }
 
   private async closeAndDeleteBuffer(document: vscode.TextDocument): Promise<void> {
+    this.imagePreview.dispose();
     await vscode.window.showTextDocument(document, { preview: false });
     await document.save();
     await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
@@ -224,5 +271,11 @@ export class ComposeBufferSession {
     return vscode.workspace
       .getConfiguration('composeBuffer')
       .get<CommitBehavior>('commitBehavior', 'copyAndPaste');
+  }
+
+  private shouldOpenImagePreview(): boolean {
+    return vscode.workspace
+      .getConfiguration('composeBuffer')
+      .get<boolean>('openImagePreviewOnPaste', true);
   }
 }

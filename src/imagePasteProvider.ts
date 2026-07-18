@@ -12,6 +12,7 @@ interface ImagePasteProviderOptions {
   getPreferredImageRoot(): vscode.Uri | undefined;
   getImageDirectory(): string;
   getImageReferenceStyle(): ImageReferenceStyle;
+  showImagePreview(file: vscode.Uri, document: vscode.TextDocument): Thenable<unknown>;
 }
 
 interface ImageTarget {
@@ -59,6 +60,7 @@ export class ImagePasteProvider implements vscode.DocumentPasteEditProvider {
 
     await vscode.workspace.fs.createDirectory(target.directory);
     await vscode.workspace.fs.writeFile(target.file, bytes);
+    await this.options.showImagePreview(target.file, document);
 
     const edit = new vscode.DocumentPasteEdit(
       formatImageReference(target.referencePath, this.options.getImageReferenceStyle()),

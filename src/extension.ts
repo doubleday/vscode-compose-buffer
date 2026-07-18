@@ -19,6 +19,7 @@ export function activate(context: vscode.ExtensionContext) {
   const session = new ComposeBufferSession(context, languageId);
 
   context.subscriptions.push(
+    session,
     vscode.window.onDidChangeActiveTerminal(session.handleActiveTerminalChanged),
     vscode.window.onDidCloseTerminal(session.handleTerminalClosed),
     vscode.window.onDidChangeActiveTextEditor(session.updateActiveContext),
@@ -27,6 +28,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('composeBuffer.restoreLastPromptFromTerminal', session.restoreLastPromptFromTerminal),
     vscode.commands.registerCommand('composeBuffer.commit', session.commit),
     vscode.commands.registerCommand('composeBuffer.copyOnly', session.copyOnly),
+    vscode.commands.registerCommand('composeBuffer.toggleImagePreview', session.toggleImagePreview),
     vscode.commands.registerCommand('composeBuffer.cancel', session.cancel),
     vscode.commands.registerCommand('composeBuffer.rebuildFileIndex', workspacePathIndex.rebuild),
     vscode.languages.registerCompletionItemProvider(
@@ -46,7 +48,8 @@ export function activate(context: vscode.ExtensionContext) {
         isComposeBuffer: session.isComposeBuffer,
         getPreferredImageRoot: session.getPreferredImageRoot,
         getImageDirectory,
-        getImageReferenceStyle
+        getImageReferenceStyle,
+        showImagePreview: session.showImagePreview
       }),
       {
         providedPasteEditKinds: [vscode.DocumentDropOrPasteEditKind.Text],

@@ -21,6 +21,16 @@ const {
   getFuzzyMatchScore,
   normalizeAgentCompletions
 } = require('../dist/agentCompletions');
+const { ImagePreviewCollection } = require('../dist/imagePreviewCollection');
+
+const imagePreviews = new ImagePreviewCollection();
+assert.equal(imagePreviews.hasEntries, false);
+assert.equal(imagePreviews.add({ toString: () => 'file:///first.png' }), true);
+assert.equal(imagePreviews.add({ toString: () => 'file:///first.png' }), false);
+assert.equal(imagePreviews.add({ toString: () => 'file:///second.png' }), true);
+assert.equal(imagePreviews.values.length, 2);
+imagePreviews.clear();
+assert.equal(imagePreviews.hasEntries, false);
 
 assert.deepEqual(
   normalizeAgentCompletions([' review ', '/deploy', '$skill'], '$'),

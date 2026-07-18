@@ -9,6 +9,7 @@ A minimal VS Code extension that opens a native editor as a compose buffer for t
 - `Compose Buffer: Restore Last Prompt From Terminal` sends `Ctrl+C` to the active terminal, then restores the last prompt.
 - `Compose Buffer: Commit` copies the buffer to the clipboard and sends it to the captured terminal.
 - `Compose Buffer: Copy Only` copies the buffer without sending it to a terminal.
+- `Compose Buffer: Toggle Image Preview` shows or hides the pasted-images panel (`Ctrl+Alt+I`).
 - `Compose Buffer: Cancel` closes the buffer without copying.
 
 While the compose buffer is active, `Ctrl+Enter` and `Esc` commit it. With terminal focus, `Cmd+Shift+Enter` restores the last prompt on macOS unless terminal text is selected.
@@ -20,6 +21,7 @@ While the compose buffer is active, `Ctrl+Enter` and `Esc` commit it. With termi
 - `@f:` searches fuzzy matches on file names, and `@d:` searches fuzzy matches on directory names without matching across path separators.
 - `$` and `/` completions can suggest configured agent skills or commands.
 - Pasted images are written to `.images/` by default and inserted as `@.images/<timestamp>.png`.
+- Pasting images opens a single preview panel beside the compose buffer. It collects every image pasted during the session and closes with the compose buffer. Set `composeBuffer.openImagePreviewOnPaste` to `false` to disable this.
 - If shell integration exposes a workspace-local terminal cwd, pasted images are saved relative to that cwd.
 
 ## File References
