@@ -11,6 +11,7 @@ tsconfig.json
 .mcp-gw
 .mcp.json
 .vscode
+.vscode-test.cjs
 .gitignore
 AGENTS.md
 package-lock.json

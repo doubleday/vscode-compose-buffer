@@ -2,7 +2,7 @@
   "name": "compose-buffer",
   "displayName": "Compose Buffer",
   "description": "A native VS Code compose buffer for terminal-based coding agents.",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "publisher": "DanielDoubleday",
   "license": "MIT",
   "icon": "resources/compose-buffer-icon.png",
