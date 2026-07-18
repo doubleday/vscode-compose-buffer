@@ -23,6 +23,7 @@
   "scripts": {
     "compile": "tsc -p ./",
     "check": "npm run compile && node test/helpers.test.js",
+    "test:integration": "npm run compile && vscode-test --label integration",
     "package": "vsce package",
     "publish:marketplace": "vsce publish",
     "install:local": "npm run check && vsce package --out compose-buffer-local.vsix && code --install-extension compose-buffer-local.vsix --force",
@@ -208,7 +209,10 @@
   "devDependencies": {
     "@types/node": "^20.14.12",
     "@types/vscode": "^1.92.0",
+    "@vscode/test-cli": "^0.0.15",
+    "@vscode/test-electron": "^3.0.0",
     "@vscode/vsce": "^3.6.0",
+    "mocha": "^11.7.6",
     "typescript": "^5.5.4"
   }
 }

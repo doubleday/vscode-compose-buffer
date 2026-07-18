@@ -53,7 +53,7 @@ export class ImagePreviewPanel implements vscode.Disposable {
         const createdGroup = this.createdGroup;
         this.panel = undefined;
         this.createdGroup = undefined;
-        this.closeOwnedEmptyGroup(createdGroup);
+        void this.closeOwnedEmptyGroup(createdGroup).catch(() => undefined);
       });
     }
 
@@ -67,16 +67,18 @@ export class ImagePreviewPanel implements vscode.Disposable {
     panel?.dispose();
   }
 
-  private closeOwnedEmptyGroup(createdGroup: vscode.ViewColumn | undefined): void {
+  private async closeOwnedEmptyGroup(createdGroup: vscode.ViewColumn | undefined): Promise<void> {
     if (!createdGroup) {
       return;
     }
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
 
     const group = vscode.window.tabGroups.all.find(
       (candidate) => candidate.viewColumn === createdGroup
     );
     if (group?.tabs.length === 0) {
-      void vscode.window.tabGroups.close(group, true).then(undefined, () => undefined);
+      await vscode.window.tabGroups.close(group, true);
     }
   }
 

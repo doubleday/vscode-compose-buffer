@@ -74,7 +74,12 @@ Custom aliases are also supported:
 ```sh
 npm install
 npm run check
+npm run test:integration
 ```
+
+`npm run check` runs the fast Node-based unit tests. `npm run test:integration`
+launches an isolated VS Code Extension Development Host to verify editor-group and
+webview behavior.
 
 ## Install From GitHub Release
 
