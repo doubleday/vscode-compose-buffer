@@ -46,6 +46,7 @@ export class ComposeBufferSession implements vscode.Disposable {
   };
 
   readonly open = async (): Promise<void> => {
+    await this.discardActiveBuffer();
     await this.openWithText();
   };
 
@@ -180,6 +181,25 @@ export class ComposeBufferSession implements vscode.Disposable {
     await vscode.languages.setTextDocumentLanguage(document, this.languageId);
     await vscode.window.showTextDocument(document, { preview: false });
     await this.enterVimInsertMode();
+    await this.updateActiveContext();
+  }
+
+  private async discardActiveBuffer(): Promise<void> {
+    if (!this.activeBufferUri) {
+      return;
+    }
+
+    const document = vscode.workspace.textDocuments.find(
+      (candidate) => candidate.uri.toString() === this.activeBufferUri?.toString()
+    );
+    if (document) {
+      await this.closeAndDeleteBuffer(document);
+      return;
+    }
+
+    this.activeBufferUri = undefined;
+    this.capturedTerminal = undefined;
+    this.imagePreview.dispose();
     await this.updateActiveContext();
   }
 
